@@ -1,0 +1,30 @@
+---
+title: "p8105_hw6_ps3194"
+author: "Pangsibo Shen"
+date: "12/5/2020"
+output: html_document
+---
+```{r message=FALSE}
+library(tidyverse)
+library(modelr)
+library(p8105.datasets)
+```
+
+```{r}
+homicide_df = 
+  read_csv("data/homicide-data.csv", na = c("", "NA", "Unknown")) %>%
+  mutate(
+    city_state = str_c(city, state, sep = ", "),
+    victim_age = as.numeric(victim_age),
+    resolution = case_when(
+      disposition == "Closed without arrest" ~ 0,
+      disposition == "Open/No arrest"        ~ 0,
+      disposition == "Closed by arrest"      ~ 1)
+    )%>% 
+  filter(
+    victim_race %in% c("White", "Black"),
+    city_state != "Tulsa, AL"
+    ) %>%
+  select(city_state, resolution, victim_age, victim_race, victim_sex)
+```
+
