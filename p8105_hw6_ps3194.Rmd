@@ -121,9 +121,9 @@ summary(fit_model)
 
 After reviewed the summary of the model after backward elimination, we took additional step to drop the fincome since its p-value is greater than 0.05. We also removed delwt and ppwt and added wtgain which is delwt - ppwt. Finally, we got the fit_model as the proposed model.
 
-## Diagnostics
 
 ```{r}
+# Diagnostics
 birthweight_df %>% 
   modelr::add_residuals(fit_model) %>% 
   modelr::add_predictions(fit_model) %>% 
@@ -131,9 +131,66 @@ birthweight_df %>%
   geom_point() +
   xlab("Predicted/Fitted value") +
   ylab("Residual") +
-  ggtitle("Residual Plot for Y (baby’s birth weight)") +
+  ggtitle("Residual vs Fitted Values Plot") +
   geom_hline(yintercept=00, linetype = "dashed", color = "red")
 ```
 
+now, let's construct the other two models provided by the prompt!
+```{r}
+fit_p1 = lm(formula = bwt ~ blength + gaweeks, data = birthweight_df)
+tidy(fit_p1)
+fit_p2 = lm(formula = bwt ~ babysex*bhead*blength, data = birthweight_df)
+tidy(fit_p2)
+```
 
+```{r}
+cv_df = 
+  crossv_mc(birthweight_df, 100) %>%
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble)
+  )
+```
 
+```{r}
+cv_df = 
+  cv_df %>% 
+  mutate(
+    fit_model = map(.x = train, ~ lm(formula = bwt ~ babysex + bhead  + blength + wtgain + gaweeks + mheight + mrace + parity  + smoken, data = .x)),
+    fit_p1 = map(.x = train, ~ lm(formula = bwt ~ blength + gaweeks, data = .x)),
+    fit_p2 = map(.x = train, ~ lm(formula = bwt ~ babysex*bhead*blength, data = .x))
+  ) %>% 
+  mutate(
+    rmse_model = map2_dbl(.x = fit_model, .y = test, ~rmse(model = .x, data = .y)),
+    rmse_p1 = map2_dbl(.x = fit_p1, .y = test, ~rmse(model = .x, data = .y)),
+    rmse_p2 = map2_dbl(.x = fit_p2, .y = test, ~rmse(model = .x, data = .y))
+  )
+```
+
+```{r}
+#calculate mean prediction error across three models
+cv_df %>% 
+  select(starts_with("rmse")) %>% 
+  pivot_longer(
+    everything(),
+    names_to = "model",
+    values_to = "rmse",
+    names_prefix = "rmse_"
+  ) %>% 
+  group_by(model) %>% 
+  summarize(avg_rmse = mean(rmse))
+```
+
+```{r}
+#plot the mean prediction error density across three models
+cv_df %>% 
+  select(starts_with("rmse")) %>% 
+  pivot_longer(
+    everything(),
+    names_to = "model",
+    values_to = "rmse",
+    names_prefix = "rmse_"
+  ) %>% 
+  ggplot(aes(x = model, y = rmse)) +
+  geom_violin()
+```
