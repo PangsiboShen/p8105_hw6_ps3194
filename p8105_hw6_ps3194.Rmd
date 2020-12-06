@@ -8,7 +8,10 @@ output: html_document
 library(tidyverse)
 library(modelr)
 library(p8105.datasets)
+library(broom)
 ```
+
+## Problem 1
 
 ```{r}
 homicide_df = 
@@ -81,8 +84,56 @@ models_results_df %>%
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 ```
 
+## Problem 2
 
+```{r}
+birthweight_df = 
+  read_csv("data/birthweight.csv") %>%
+  mutate(
+    babysex = as.factor(babysex),
+    frace = as.factor(frace),
+    malform = as.factor(malform),
+    mrace = as.factor(mrace)
+  ) %>%
+  relocate(bwt, .after = wtgain)
+```
+```{r}
+# Fit a regression using all predictors
+mult_fit = lm(bwt ~., data = birthweight_df)
+summary(mult_fit)
+```
 
+For the MLR variable selection process, we are going to implement backward elimination which takes out non-significant variables 'one at a time' starting with the highest p-value.
+```{r}
+# backward elimination
+step(mult_fit, direction = 'backward')
+```
+
+After the backward elimination, we ended up with a new model below:
+```{r}
+fit_be = lm(formula = bwt ~ babysex + bhead + blength + delwt + fincome + 
+    gaweeks + mheight + mrace + parity + ppwt + smoken, data = birthweight_df)
+summary(fit_be)
+
+fit_model =  lm(formula = bwt ~ babysex + bhead  + blength + wtgain + gaweeks + mheight + mrace + parity  + smoken, data = birthweight_df)
+summary(fit_model)
+```
+
+After reviewed the summary of the model after backward elimination, we took additional step to drop the fincome since its p-value is greater than 0.05. We also removed delwt and ppwt and added wtgain which is delwt - ppwt. Finally, we got the fit_model as the proposed model.
+
+## Diagnostics
+
+```{r}
+birthweight_df %>% 
+  modelr::add_residuals(fit_model) %>% 
+  modelr::add_predictions(fit_model) %>% 
+  ggplot(aes(x = pred, y = resid)) + 
+  geom_point() +
+  xlab("Predicted/Fitted value") +
+  ylab("Residual") +
+  ggtitle("Residual Plot for Y (baby’s birth weight)") +
+  geom_hline(yintercept=00, linetype = "dashed", color = "red")
+```
 
 
 
