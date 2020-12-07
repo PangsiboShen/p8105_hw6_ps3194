@@ -194,3 +194,93 @@ cv_df %>%
   ggplot(aes(x = model, y = rmse)) +
   geom_violin()
 ```
+
+## Porblem 3
+```{r}
+weather_df = 
+  rnoaa::meteo_pull_monitors(
+    c("USW00094728"),
+    var = c("PRCP", "TMIN", "TMAX"), 
+    date_min = "2017-01-01",
+    date_max = "2017-12-31") %>%
+  mutate(
+    name = recode(id, USW00094728 = "CentralPark_NY"),
+    tmin = tmin / 10,
+    tmax = tmax / 10) %>%
+  select(name, id, everything())
+```
+
+```{r}
+weather_bootstrap = 
+  weather_df %>%
+  modelr::bootstrap(5000, id = "strap_number") %>%
+  mutate(
+    models = map(.x = strap, ~lm(tmax ~tmin, data = .x)), 
+    results = map(models, broom::tidy),
+    glance = map(models, broom::glance)
+  ) %>%
+  select(strap_number, results, glance)
+```
+
+```{r}
+#Plot the distribution of r squared
+weather_bootstrap %>%
+  unnest(glance) %>%
+  ggplot(aes(r.squared)) +
+  geom_density()
+
+
+r_squared = 
+  weather_bootstrap %>%
+  unnest(glance) %>%
+  select(r.squared) %>%
+  unlist()
+
+#construct 95% CI for r squared
+r_squared_CI = 
+  tibble(
+    mean = mean(r_squared),
+    ci_lower = quantile(r_squared, 0.025),
+    ci_upper = quantile(r_squared, 0.975)
+    )
+
+r_squared_CI
+```
+
+```{r}
+#Plot the distribution of log(intercept*beta1)
+weather_bootstrap %>%
+  unnest(results) %>%
+  select(strap_number, term, estimate) %>%
+  pivot_wider(names_from  = term, values_from = estimate) %>%
+  rename(intercept = '(Intercept)') %>%
+  mutate(estimate = log10(intercept*tmin)) %>%
+  ggplot(aes(estimate)) +
+  geom_density()
+
+log_betas = 
+  weather_bootstrap %>%
+  unnest(results) %>%
+  select(strap_number, term, estimate) %>%
+  pivot_wider(names_from  = term, values_from = estimate) %>%
+  rename(intercept = '(Intercept)') %>%
+  mutate(estimate = log10(intercept*tmin)) %>%
+  select(estimate) %>%
+  unlist()
+
+#construct 95% CI for log(intercept*beta1)
+log_betas_CI = 
+  tibble(
+    mean = mean(log_betas),
+    ci_lower = quantile(log_betas, 0.025),
+    ci_upper = quantile(log_betas, 0.975)
+    )
+
+log_betas_CI
+```
+
+
+
+
+
+
