@@ -2,7 +2,7 @@
 title: "p8105_hw6_ps3194"
 author: "Pangsibo Shen"
 date: "12/5/2020"
-output: pdf_document
+output: github_document
 ---
 ```{r message=FALSE}
 library(tidyverse)
@@ -29,9 +29,13 @@ homicide_df =
     city_state != c("Tulsa, AL")
     ) %>%
   select(city_state, resolution, victim_age, victim_race, victim_sex)
+
+homicide_df %>%
+  head() %>%
+  knitr::kable()
 ```
 
-Start with one city.
+Start with one city Baltimore.
 
 ```{r}
 baltimore_df =
@@ -51,7 +55,7 @@ glm(resolution ~ victim_age + victim_race + victim_sex,
   knitr::kable(digits = 3)
 ```
 
-Try this across cities.
+The adjusted odds ratio for solving homicides for white is 2.32 with a Confidence Interval (1.648, 3.268). In other words, keeping all other variables fixed, the odds of non-white victim cases been resolved is 2.32 times the odds of white victims cases and we're 95% confidence that the true aOR falls within 1.648 and 3.268.
 
 ```{r}
 models_results_df = 
@@ -73,7 +77,6 @@ models_results_df =
 ```
 
 
-
 ```{r}
 models_results_df %>%
   filter(term == "victim_sexMale") %>%
@@ -83,6 +86,9 @@ models_results_df %>%
   geom_errorbar(aes(ymin = CI_lower, ymax = CI_upper)) +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 ```
+Albuquerque, NM, Stockton, CA and Fresno, CA have the highest aORs for solving homicides comparing Black victims to white victims among all the cities. These three cities also have the widest ranges for CIs among all the cities. New York City has the lowest aORs for solving homicides comparing Black victims to white victims among all the cities and it's CI doesn't include 1. Hence, we can conclude that in New York City, it is more likely for a white-victim case to be solved comparing to a non-white victim case.
+
+-----------------------------------------
 
 ## Problem 2
 
@@ -103,13 +109,19 @@ mult_fit = lm(bwt ~., data = birthweight_df)
 summary(mult_fit)
 ```
 
-For the MLR variable selection process, we are going to implement backward elimination which takes out non-significant variables 'one at a time' starting with the highest p-value.
+In order to propose a regression model for birthweight, I am going to implement backward elimination which takes out non-significant variables 'one at a time' starting with the highest p-value until all non-significant predictors have been removed.
+
 ```{r}
 # backward elimination
 step(mult_fit, direction = 'backward')
 ```
 
 After the backward elimination, we ended up with a new model below:
+
+$$
+bwt = \beta_0+\beta_1babysex+\beta_2bhead+\beta_3blength+\beta_4delwt+\beta_5fincome+\beta_6gaweeks+\beta_7mheight+\beta_8mrace + \beta_9parity + \beta_{10}ppwt+ \beta_{11}smoken
+$$
+
 ```{r}
 fit_be = lm(formula = bwt ~ babysex + bhead + blength + delwt + fincome + 
     gaweeks + mheight + mrace + parity + ppwt + smoken, data = birthweight_df)
@@ -121,6 +133,9 @@ summary(fit_model)
 
 After reviewed the summary of the model after backward elimination, we took additional step to drop the fincome since its p-value is greater than 0.05. We also removed delwt and ppwt and added wtgain which is delwt - ppwt. Finally, we got the fit_model as the proposed model.
 
+$$
+bwt = \beta_0+\beta_1babysex+\beta_2bhead+\beta_3blength+\beta_4wtgain+\beta_5gaweeks+\beta_6mheight+\beta_7mrace + \beta_8parity + \beta_9smoken
+$$
 
 ```{r}
 # Diagnostics
@@ -131,11 +146,12 @@ birthweight_df %>%
   geom_point() +
   xlab("Predicted/Fitted value") +
   ylab("Residual") +
-  ggtitle("Residual vs Fitted Values Plot") +
+  ggtitle("Residual vs Fitted Values Plot for Proposed Model") +
   geom_hline(yintercept=00, linetype = "dashed", color = "red")
 ```
 
-now, let's construct the other two models provided by the prompt!
+Now let's construct the other two models provided by the prompt!
+
 ```{r}
 fit_p1 = lm(formula = bwt ~ blength + gaweeks, data = birthweight_df)
 tidy(fit_p1)
@@ -161,7 +177,7 @@ cv_df =
     fit_p2 = map(.x = train, ~ lm(formula = bwt ~ babysex*bhead*blength, data = .x))
   ) %>% 
   mutate(
-    rmse_model = map2_dbl(.x = fit_model, .y = test, ~rmse(model = .x, data = .y)),
+    rmse_proposed = map2_dbl(.x = fit_model, .y = test, ~rmse(model = .x, data = .y)),
     rmse_p1 = map2_dbl(.x = fit_p1, .y = test, ~rmse(model = .x, data = .y)),
     rmse_p2 = map2_dbl(.x = fit_p2, .y = test, ~rmse(model = .x, data = .y))
   )
@@ -194,6 +210,9 @@ cv_df %>%
   ggplot(aes(x = model, y = rmse)) +
   geom_violin()
 ```
+My proposed model using backward elimination has the smallest average rmse of 274.9 among three models. Model p1 which is using length at birth and gestational age as predictors has the largest average rmse of 335.4.
+
+-----------------------------------------
 
 ## Porblem 3
 ```{r}
@@ -211,6 +230,8 @@ weather_df =
 ```
 
 ```{r}
+set.seed(123)
+#create bootstrap object with 5000 estimates
 weather_bootstrap = 
   weather_df %>%
   modelr::bootstrap(5000, id = "strap_number") %>%
@@ -227,8 +248,8 @@ weather_bootstrap =
 weather_bootstrap %>%
   unnest(glance) %>%
   ggplot(aes(r.squared)) +
-  geom_density()
-
+  geom_density() +
+  ggtitle("The Distribution of R Squared")
 
 r_squared = 
   weather_bootstrap %>%
@@ -246,6 +267,8 @@ r_squared_CI =
 
 r_squared_CI
 ```
+The estimate for R square is 0.9116109 with confidence interval lower bound of 0.8943557 and upper bound 0.9273405.The distribution for R squared is a little skewed to the left and doesn't quite follow a normal distribution. But since we are using bootstrap, we don't have to worry about distribution assumption to make inference.
+
 
 ```{r}
 #Plot the distribution of log(intercept*beta1)
@@ -256,7 +279,8 @@ weather_bootstrap %>%
   rename(intercept = '(Intercept)') %>%
   mutate(estimate = log10(intercept*tmin)) %>%
   ggplot(aes(estimate)) +
-  geom_density()
+  geom_density() +
+  ggtitle("The Distribution of log(intercept*beta1)")
 
 log_betas = 
   weather_bootstrap %>%
@@ -278,7 +302,7 @@ log_betas_CI =
 
 log_betas_CI
 ```
-
+The estimate for $log(\hat\beta_0*\hat\beta_1)$ is 0.8744846 with confidence interval lower bound of 0.85364 and upper bound 0.8940337. distribution for $log(\hat\beta_0*\hat\beta_1)$ has two peaks in the middle. But since we are using bootstrap, we don't have to worry about distribution assumption to make inference.
 
 
 
